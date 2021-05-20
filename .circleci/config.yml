@@ -1,0 +1,16 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: cimg/base:2021.05
+    steps:
+      - checkout
+      # Whatever you want to do
+      - run: |
+          sudo apt update -y
+          sudo apt install libguestfs-tools build-essential wget git linux-generic sudo -y
+      - run: |
+          ./generate-unique-machine-values.sh \
+              -c 10 \
+              --model="iMac17,1"
