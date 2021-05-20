@@ -13,4 +13,4 @@ jobs:
       - run: |
           ./generate-unique-machine-values.sh \
               -c 1 \
-              --model="iMacPro1,1"
+              --model="iMac17,1"
