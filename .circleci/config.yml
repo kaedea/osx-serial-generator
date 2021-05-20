@@ -12,5 +12,5 @@ jobs:
           sudo apt install libguestfs-tools build-essential wget git linux-generic sudo -y
       - run: |
           ./generate-unique-machine-values.sh \
-              -c 1 \
+              -c 10 \
               --model="iMac17,1"
