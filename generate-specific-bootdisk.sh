@@ -24,6 +24,7 @@ Required options:
 Optional options:
     --width <integer>               Resolution x axis length in px, default 1920
     --height <integer>              Resolution y axis length in px, default 1080
+    --kernel-args <string>          Additional boot-args
     --input-plist-url <url>         Specify an alternative master plist, via URL
     --master-plist-url <url>        Same as above.
     --custom-plist <filename>       Optionally change the input plist.
@@ -193,12 +194,12 @@ done
 
 download_qcow_efi_folder () {
 
-    export EFI_FOLDER=./OpenCore-Catalina/EFI
+    export EFI_FOLDER=./OpenCore/EFI
     export RESOURCES_FOLDER=./resources/OcBinaryData/Resources
 
     # check if we are inside OSX-KVM already
     # if not, download OSX-KVM locally
-    [ -d ./OpenCore-Catalina/EFI/ ] || {
+    [ -d ./OpenCore/EFI/ ] || {
         [ -d ./OSX-KVM/ ] || git clone --recurse-submodules --depth 1 https://github.com/kholia/OSX-KVM.git
         export EFI_FOLDER="./OSX-KVM/${EFI_FOLDER}"
     }
@@ -227,14 +228,14 @@ generate_bootdisk () {
         echo 'You specified both a custom plist FILE & custom plist URL.'
         echo 'Use only one of those options.'
     elif [ "${MASTER_PLIST_URL}" ]; then
-        wget -O "${MASTER_PLIST:=./config-custom.plist}" "${MASTER_PLIST_URL}"
+        curl -L -o "${MASTER_PLIST:=./config-custom.plist}" "${MASTER_PLIST_URL}"
     else
         # default is config-nopicker-custom.plist from OSX-KVM with placeholders used in Docker-OSX
-        wget -O "${MASTER_PLIST:=./config-nopicker-custom.plist}" "${MASTER_PLIST_URL}"
+        curl -L -o "${MASTER_PLIST:=./config-nopicker-custom.plist}" "${MASTER_PLIST_URL}"
     fi
 
     [ -e ./opencore-image-ng.sh ] \
-        || { wget "${OPENCORE_IMAGE_MAKER_URL}" \
+        || { curl -OL "${OPENCORE_IMAGE_MAKER_URL}" \
             && chmod +x opencore-image-ng.sh ; }
 
     # plist required for bootdisks, so create anyway.
@@ -244,7 +245,7 @@ generate_bootdisk () {
             && [ "${UUID}" ] \
             && [ "${MAC_ADDRESS}" ]; then
         ROM="${MAC_ADDRESS//\:/}"
-        ROM="${ROM,,}"
+        ROM="$(awk '{print tolower($0)}' <<< "${ROM}")"
         sed -e s/\{\{DEVICE_MODEL\}\}/"${DEVICE_MODEL}"/g \
             -e s/\{\{SERIAL\}\}/"${SERIAL}"/g \
             -e s/\{\{BOARD_SERIAL\}\}/"${BOARD_SERIAL}"/g \
@@ -252,6 +253,7 @@ generate_bootdisk () {
             -e s/\{\{ROM\}\}/"${ROM}"/g \
             -e s/\{\{WIDTH\}\}/"${WIDTH:-1920}"/g \
             -e s/\{\{HEIGHT\}\}/"${HEIGHT:-1080}"/g \
+            -e s/\{\{KERNEL_ARGS\}\}/"${KERNEL_ARGS:-}"/g \
             "${MASTER_PLIST}" > ./tmp.config.plist || exit 1
     else
         cat <<EOF && exit 1
@@ -263,8 +265,11 @@ Error: one of the following values is missing:
 --uuid "${UUID:-MISSING}"
 --mac-address "${MAC_ADDRESS:-MISSING}"
 
+Optional:
+
 --width "${WIDTH:-1920}"
 --height "${HEIGHT:-1080}"
+--kernel-args "${KERNEL_ARGS:-}"
 
 EOF
     fi

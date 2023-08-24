@@ -22,6 +22,7 @@ General options:
     --output-dir <directory>        Optionally change the script output location
     --width <string>                Resolution x axis length in px, default 1920
     --height <string>               Resolution y axis length in px, default 1080
+    --kernel-args <string>          Additional boot-args
     --input-plist-url <url>         Specify an alternative master plist, via URL
     --master-plist-url <url>        Same as above.
     --custom-plist <filename>       Optionally change the input plist.
@@ -38,7 +39,7 @@ Additional options only if you are creating ONE serial set:
 
 Custom plist placeholders:
     {{DEVICE_MODEL}}, {{SERIAL}}, {{BOARD_SERIAL}},
-    {{UUID}}, {{ROM}}, {{WIDTH}}, {{HEIGHT}}
+    {{UUID}}, {{ROM}}, {{WIDTH}}, {{HEIGHT}}, {{KERNEL_ARGS}}
 
 Example:
     ./generate-unique-machine-values.sh --count 1 --plists --bootdisks --envs
@@ -221,17 +222,17 @@ build_mac_serial () {
 
 download_vendor_mac_addresses () {
     # download the MAC Address vendor list
-    [ -e "${MAC_ADDRESSES_FILE:=vendor_macs.tsv}" ] || wget -O "${MAC_ADDRESSES_FILE}" https://gitlab.com/wireshark/wireshark/-/raw/master/manuf
+    [ -e "${MAC_ADDRESSES_FILE:=vendor_macs.tsv}" ] || curl -L -o "${MAC_ADDRESSES_FILE}" https://gitlab.com/wireshark/wireshark/-/raw/master/manuf
 }
 
 download_qcow_efi_folder () {
 
-    export EFI_FOLDER=./OpenCore-Catalina/EFI
+    export EFI_FOLDER=./OpenCore/EFI
     export RESOURCES_FOLDER=./resources/OcBinaryData/Resources
 
     # check if we are inside OSX-KVM already
     # if not, download OSX-KVM locally
-    [ -d ./OpenCore-Catalina/EFI/ ] || {
+    [ -d ./OpenCore/EFI/ ] || {
         [ -d ./OSX-KVM/ ] || git clone --recurse-submodules --depth 1 https://github.com/kholia/OSX-KVM.git
         export EFI_FOLDER="./OSX-KVM/${EFI_FOLDER}"
     }
@@ -289,14 +290,14 @@ generate_serial_sets () {
 
             # append to csv file
             tee -a "${CSV_SERIAL_SETS_FILE}" <<EOF
-"${DEVICE_MODEL}","${SERIAL}","${BOARD_SERIAL}","${UUID}","${MAC_ADDRESS}","${WIDTH}","${HEIGHT}"
+"${DEVICE_MODEL}","${SERIAL}","${BOARD_SERIAL}","${UUID}","${MAC_ADDRESS}","${WIDTH}","${HEIGHT}","${KERNEL_ARGS}"
 EOF
             echo "Wrote CSV to: ${CSV_SERIAL_SETS_FILE}"
 
             # append to tsv file
             T=$'\t'
             tee -a "${TSV_SERIAL_SETS_FILE}" <<EOF
-${DEVICE_MODEL}${T}${SERIAL}${T}${BOARD_SERIAL}${T}${UUID}${T}${MAC_ADDRESS}${T}${WIDTH}${T}${HEIGHT}
+${DEVICE_MODEL}${T}${SERIAL}${T}${BOARD_SERIAL}${T}${UUID}${T}${MAC_ADDRESS}${T}${WIDTH}${T}${HEIGHT}${T}${KERNEL_ARGS}
 EOF
             echo "Wrote TSV to: ${TSV_SERIAL_SETS_FILE}"
 
@@ -327,16 +328,16 @@ EOF
                     echo 'You specified both a custom plist FILE & custom plist URL.'
                     echo 'Use only one of those options.'
                 elif [ "${MASTER_PLIST_URL}" ]; then
-                    wget -O "${MASTER_PLIST:=./config-custom.plist}" "${MASTER_PLIST_URL}"
+                    curl -L -o "${MASTER_PLIST:=./config-custom.plist}" "${MASTER_PLIST_URL}"
                 else
                     # default is config-nopicker-custom.plist from OSX-KVM with placeholders used in Docker-OSX
-                    wget -O "${MASTER_PLIST:=./config-nopicker-custom.plist}" "${MASTER_PLIST_URL}"
+                    curl -L -o "${MASTER_PLIST:=./config-nopicker-custom.plist}" "${MASTER_PLIST_URL}"
                 fi
 
                 mkdir -p "${OUTPUT_DIRECTORY}/plists"
                 source "${OUTPUT_ENV_FILE}"
-                ROM_VALUE="${MAC_ADDRESS//\:/}"
-                ROM_VALUE="${ROM_VALUE,,}"
+                ROM="${MAC_ADDRESS//\:/}"
+                ROM="$(awk '{print tolower($0)}' <<< "${ROM}")"
                 sed -e s/\{\{DEVICE_MODEL\}\}/"${DEVICE_MODEL}"/g \
                     -e s/\{\{SERIAL\}\}/"${SERIAL}"/g \
                     -e s/\{\{BOARD_SERIAL\}\}/"${BOARD_SERIAL}"/g \
@@ -344,13 +345,14 @@ EOF
                     -e s/\{\{ROM\}\}/"${ROM}"/g \
                     -e s/\{\{WIDTH\}\}/"${WIDTH}"/g \
                     -e s/\{\{HEIGHT\}\}/"${HEIGHT}"/g \
+                    -e s/\{\{KERNEL_ARGS\}\}/"${KERNEL_ARGS:-}"/g \
                     "${MASTER_PLIST}" > "${OUTPUT_DIRECTORY}/plists/${SERIAL}.config.plist" || exit 1
             fi
 
             # make bootdisk qcow2 format if --bootdisks, but also if you set the bootdisk filename
             if [ "${CREATE_BOOTDISKS}" ] || [ "${OUTPUT_BOOTDISK}" ]; then
                 [ -e ./opencore-image-ng.sh ] \
-                    || { wget "${OPENCORE_IMAGE_MAKER_URL}" \
+                    || { curl -L -O "${OPENCORE_IMAGE_MAKER_URL}" \
                         && chmod +x opencore-image-ng.sh ; }
                 mkdir -p "${OUTPUT_DIRECTORY}/bootdisks"
                 ./opencore-image-ng.sh \
@@ -361,11 +363,11 @@ EOF
         done
 
         [ -e "${CSV_SERIAL_SETS_FILE}" ] && \
-            cat <(echo "DEVICE_MODEL,SERIAL,BOARD_SERIAL,UUID,MAC_ADDRESS,WIDTH,HEIGHT") "${CSV_SERIAL_SETS_FILE}"
+            cat <(echo "DEVICE_MODEL,SERIAL,BOARD_SERIAL,UUID,MAC_ADDRESS,WIDTH,HEIGHT,KERNEL_ARGS") "${CSV_SERIAL_SETS_FILE}"
 
 
         [ -e "${TSV_SERIAL_SETS_FILE}" ] && \
-            cat <(printf "DEVICE_MODEL\tSERIAL\tBOARD_SERIAL\tUUID\tMAC_ADDRESS\tWIDTH\tHEIGHT\n") "${TSV_SERIAL_SETS_FILE}"
+            cat <(printf "DEVICE_MODEL\tSERIAL\tBOARD_SERIAL\tUUID\tMAC_ADDRESS\tWIDTH\tHEIGHT\tKERNEL_ARGS\n") "${TSV_SERIAL_SETS_FILE}"
 
 }
 
