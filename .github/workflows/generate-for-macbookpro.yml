@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: CI-Generate-For-iMac
 
 # Controls when the workflow will run
 on:
@@ -34,3 +34,15 @@ jobs:
         run: |
           echo Add other actions to build,
           echo test, and deploy your project.
+          
+      - name: Run a multi-line script
+        run: |
+          sudo apt update -y
+          sudo apt install libguestfs-tools build-essential wget git linux-generic sudo -y
+
+      - name: Run a multi-line script
+        run: |
+          ./generate-unique-machine-values.sh \
+              -c 10 \
+              --model="MacBookPro13,1"
+          
