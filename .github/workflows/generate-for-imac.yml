@@ -35,11 +35,12 @@ jobs:
           echo Add other actions to build,
           echo test, and deploy your project.
 
-      - name: Run `install deps`
+      - name: Run install deps
         run: |
           sudo apt update -y
           sudo apt install libguestfs-tools build-essential wget git linux-generic sudo -y
-      - name: Run `generate`
+          
+      - name: Run generate
       - run: |
           ./generate-unique-machine-values.sh \
               -c 10 \
