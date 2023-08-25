@@ -34,14 +34,16 @@ jobs:
         run: |
           echo Add other actions to build,
           echo test, and deploy your project.
-
-      - name: Run install deps
+          
+      - name: Run a multi-line script
         run: |
           sudo apt update -y
           sudo apt install libguestfs-tools build-essential wget git linux-generic sudo -y
-          
-      - name: Run generate
-      - run: |
+
+      - name: Run a multi-line script
+        run: |
           ./generate-unique-machine-values.sh \
               -c 10 \
               --model="iMac17,1"
+          
+
